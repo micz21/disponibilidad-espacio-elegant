@@ -20,6 +20,7 @@
  */
 
 const { JWT } = require('google-auth-library');
+const LOGO_DATA_URI = require('./_logo.js');
 
 // ---------------------- CONFIGURACIÓN DEL ESPACIO ----------------------
 const START_HOUR = 8;
@@ -251,8 +252,8 @@ function renderWeekPage(opts) {
 '  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}' +
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
-'  .brand{display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:2px;}' +
-'  .brand-mark{width:28px;height:28px;border:2px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:var(--gold);font-size:14px;font-family:Georgia,serif;}' +
+'  .brand{display:flex;align-items:center;justify-content:center;margin-bottom:2px;}' +
+'  .brand-mark{height:64px;width:auto;object-fit:contain;display:block;}' +
 '  .brand-name{letter-spacing:1.5px;font-size:12px;text-transform:uppercase;color:var(--gold);font-weight:600;}' +
 '  h1{text-align:center;font-family:Georgia,"Times New Roman",serif;font-size:20px;margin:10px 0 0;font-weight:normal;letter-spacing:.5px;}' +
 '  .sub{display:block;text-transform:uppercase;font-size:17px;font-weight:bold;letter-spacing:1.5px;margin-top:2px;color:var(--ink);}' +
@@ -261,6 +262,9 @@ function renderWeekPage(opts) {
 '  .nav-btn.disabled{opacity:.35;}' +
 '  .legend{display:flex;justify-content:center;gap:18px;margin:14px 0 4px;font-size:12px;}' +
 '  .legend span{display:inline-flex;align-items:center;gap:5px;}' +
+'  .color-note{display:flex;justify-content:center;gap:16px;margin:10px 0 4px;font-size:13px;flex-wrap:wrap;}' +
+'  .color-note span{display:inline-flex;align-items:center;gap:6px;}' +
+'  .color-note b{font-weight:700;}' +
 '  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
 '  .swatch.oc{background:var(--ocupado);}' +
 '  .swatch.disp{background:var(--disponible);}' +
@@ -277,11 +281,12 @@ function renderWeekPage(opts) {
 '  .footnote{text-align:center;font-size:11px;color:#8a8172;margin-top:14px;}' +
 '  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
 '</style></head><body>' +
-'  <div class="brand"><div class="brand-mark">E</div><div class="brand-name">Espacio Elegant</div></div>' +
+'  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
+'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Beige</b> = Disponible</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
 '  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
-'  <div class="legend"><span><span class="swatch disp"></span>Disponible</span><span><span class="swatch oc"></span>Ocupado</span></div>' +
   footnote +
+'  <p class="footnote">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '</body></html>';
 }
