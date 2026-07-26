@@ -1,24 +1,3 @@
-/**
- * ESPACIO ELEGANT — Disponibilidad en vivo (hosting propio, sin Apps Script)
- * ---------------------------------------------------------------------------
- * Lee Google Calendar directamente por su API usando una cuenta de servicio
- * (no requiere que nadie inicie sesión). Muestra una vista de semana,
- * mobile-first, sin banners de Google ni límites de iframe.
- *
- * VARIABLES DE ENTORNO NECESARIAS (se configuran en Vercel, no acá):
- *   GOOGLE_SERVICE_ACCOUNT_EMAIL  -> el "client_email" del JSON de la cuenta de servicio
- *   GOOGLE_PRIVATE_KEY            -> el "private_key" del JSON (tal cual, con los \n)
- *   CALENDAR_ID                   -> el ID real de tu calendario (NUNCA "primary" acá,
- *                                    porque la cuenta de servicio tiene su propio
- *                                    calendario "primary" que no es el tuyo)
- *
- * REGLAS DE BUFFER DE LIMPIEZA (iguales a como las veníamos usando):
- *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
- *   - #bufferantes en el título/descripción del evento: además bloquea
- *     30 min ANTES de que empiece.
- *   - #sinbuffer en el título/descripción: no bloquea nada extra.
- */
-
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
 
@@ -253,7 +232,7 @@ function renderWeekPage(opts) {
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
 '  .brand{display:flex;align-items:center;justify-content:center;margin-bottom:2px;}' +
-'  .brand-mark{height:64px;width:auto;object-fit:contain;display:block;}' +
+'  .brand-mark{height:46px;width:auto;object-fit:contain;display:block;}' +
 '  .brand-name{letter-spacing:1.5px;font-size:12px;text-transform:uppercase;color:var(--gold);font-weight:600;}' +
 '  h1{text-align:center;font-family:Georgia,"Times New Roman",serif;font-size:20px;margin:10px 0 0;font-weight:normal;letter-spacing:.5px;}' +
 '  .sub{display:block;text-transform:uppercase;font-size:17px;font-weight:bold;letter-spacing:1.5px;margin-top:2px;color:var(--ink);}' +
@@ -266,27 +245,29 @@ function renderWeekPage(opts) {
 '  .color-note span{display:inline-flex;align-items:center;gap:6px;}' +
 '  .color-note b{font-weight:700;}' +
 '  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
-'  .swatch.oc{background:var(--ocupado);}' +
-'  .swatch.disp{background:var(--disponible);}' +
-'  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;}' +
-'  table{border-collapse:collapse;width:100%;table-layout:fixed;background:var(--cream);}' +
-'  th{background:var(--cream);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
+'  .swatch.oc{background-image:linear-gradient(var(--ocupado),var(--ocupado));}' +
+'  .swatch.disp{background-image:linear-gradient(var(--disponible),var(--disponible));}' +
+'  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;forced-color-adjust:none;}' +
+'  table{border-collapse:collapse;width:100%;table-layout:fixed;background-image:linear-gradient(var(--cream),var(--cream));}' +
+'  th{background-image:linear-gradient(var(--cream),var(--cream));color:var(--ink);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
 '  th .dname{display:block;color:#7a7266;}' +
 '  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
 '  td.hour{width:44px;}' +
 '  td{border:1px solid var(--border);height:18px;padding:0;}' +
-'  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245;font-weight:600;white-space:nowrap;background:var(--cream);}' +
-'  td.disponible{background:var(--disponible);}' +
-'  td.ocupado{background:var(--ocupado);}' +
-'  .footnote{text-align:center;font-size:11px;color:#8a8172;margin-top:14px;}' +
+'  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245 !important;font-weight:600;white-space:nowrap;background-image:linear-gradient(var(--cream),var(--cream));}' +
+'  td.disponible{background-image:linear-gradient(var(--disponible),var(--disponible));}' +
+'  td.ocupado{background-image:linear-gradient(var(--ocupado),var(--ocupado));}' +
+'  .footnote{text-align:center;font-size:9px;color:#8a8172;margin:10px 0;line-height:1.4;}' +
+'  .legal-small{text-align:center;font-size:9px;color:#a39a8c;margin:0 0 12px;line-height:1.3;padding:0 6px;}' +
 '  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
 '</style></head><body>' +
 '  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
 '  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Beige</b> = Disponible</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
+'  <p class="legal-small">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
   footnote +
-'  <p class="footnote">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '</body></html>';
 }
+
