@@ -1,6 +1,9 @@
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
 
+const PX_DISPONIBLE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABnElEQVR42gXByQHcMAwDQICHtP2Xl29+qcA2D2SG//7+Md9N5aNyv5P1W2inLK2XWiLkZUG9d8OMDcre3Js0q3iFESzOoDlIL8P6wedtCJlnYm/gm5poul/DiMuXtIBs7yq7F3Fm1FYStj5cHPSxHlj9rA0nqPaZhenZXT1D77CzoYuTjTdcm/1+PqtZqlI8S+XiYs14BItXCxFr93QN66d8yn6/eiDTMIAH55cLzEiw6wXOF4OBDbLNfsEHxs+Fq3WkLQzTjm8ZJV4Gn3rtKmD8qoksb8+c6vWBzk4z28dhDvYzmw6bH+GfYoV2C6ICtsDxMVOIk1TAmKblOs+z7SeCJmLe8RjIx54Pl0cm41RU2dLigyg7kSuAUYKr/aCxhuDGN59FQ3ZSmfv6upTvNAUrcORjI3nd9m5+B0s4TkhsLKNtslgz3g3LIcKmIDyBo5rPKflRtEvrFGXUiZ98Z+djmMs7YViNObNvsXDsll2+2BXXFVgZEY7BNyCHHQqN2kc+VtbzcuzMbLjt94hvE9Mr3wUCKReSvUvw43/Aq1fogfIxkgAAAABJRU5ErkJggg==';
+const PX_OCUPADO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABmklEQVR42gXBiYEENwwDMOqzr8VUkTLT0o4lkQHsv3//wa/q8htkrtZja22kQWRtbG166PuU+UbOEa5jeXKD5cZJpvvRlYFQvhS/uWU+EeWOW+83dP+uZscBpwG6c4Lm/mykP/tp4ZnyMLO6bmLwZZasPsIar/AD9FUYZvNYGF9vcjgwi6VtojBmR2+QrkF57kB/XCk0NyBPbOX6nGyEKMOM6Od5y+gtN8OJVtBecHKqvDnpFgVh13UYH6zEbl5T1wtFaokoz1XnQT2FNRWbEz95OPtatPUGXhLfg8rZzGzpT3MSZg4IkRhETgrPBfkNQif9fc4j1wljgcJki/atrNrfNaKQcux4E915lxwPj4/PRFijC6a+TN59CM1zzoSiEEFMOp1CTuQMFXCmcKiB8YRNIXlhgrZ911xIf41TDcu1ZcxN3wU/0dfodpEc6zqBL8zkdvZp0GkZPJ2C2uU4XKtzrAml8uOaBQPeNAfKPhqra4QAY30r0P2NIvJpz9qanpubRzHXj9bceZ0bCyaMJQdDeGfMgkn9if8DCuhc5Bp/fAgAAAAASUVORK5CYII=';
+
 // ---------------------- CONFIGURACIÓN DEL ESPACIO ----------------------
 const START_HOUR = 8;
 const END_HOUR = 23;
@@ -25,9 +28,19 @@ module.exports = async (req, res) => {
     const tucumanShifted = new Date(nowUTC.getTime() - TZ_OFFSET_HOURS * 3600000);
     const today = civilDate(tucumanShifted.getUTCFullYear(), tucumanShifted.getUTCMonth(), tucumanShifted.getUTCDate());
 
-    const minMonday = getMonday(today);
-    const endOfLastVisibleMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0);
-    const maxMonday = getMonday(endOfLastVisibleMonth);
+    // Se puede ver 1 semana hacia atrás además de la actual (referencia/margen).
+    const minMonday = addDays(getMonday(today), -7);
+
+    // El mes siguiente recién se "libera" en la vista pública al llegar a la
+    // última semana del mes actual (momento en que se confirman las renovaciones
+    // con los clientes). Antes de eso, el tope de navegación es fin del mes actual.
+    const lastDayOfCurrentMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
+    const lastWeekStartOfCurrentMonth = getMonday(lastDayOfCurrentMonth);
+    const nextMonthUnlocked = today.getTime() >= lastWeekStartOfCurrentMonth.getTime();
+
+    const maxMonday = nextMonthUnlocked
+      ? getMonday(civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0))
+      : lastWeekStartOfCurrentMonth;
 
     let monday = params.start ? parseCivilDate(params.start) : today;
     monday = getMonday(monday);
@@ -90,8 +103,6 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
 }
 
 // ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
-// Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
-// para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
   return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 }
@@ -178,92 +189,33 @@ function baseUrl(req) {
   return proto + '://' + host;
 }
 
-// ==================== GRILLA COMO IMAGEN SVG  ====================
-// En vez de armar la grilla con <table> + CSS (que Android/Chrome puede reinterpretar
-// en modo oscuro), la dibujamos como UNA sola imagen SVG con texto, líneas y varios
-// colores. Al no ser "un color plano", Chrome no la clasifica como fondo y la deja
-// intacta siempre, sea cual sea el modo del dispositivo.
-const SVG_COLORS = {
-  cream: '#F7F2E9',
-  gold: '#B08D57',
-  ink: '#2A2420',
-  ocupado: '#C96B5C',
-  disponible: '#EDE7DA',
-  border: '#E3DAC7',
-  dname: '#7a7266',
-  hour: '#5a5245',
-};
-
-const HOUR_COL_W = 60;
-const DAY_COL_W = 100;
-const HEADER_H = 58;
-const ROW_H = 20;
-
-function buildGridSvg(monday, occupiedByDay, slots) {
-  var numDays = DAYS_PER_WEEK;
-  var gridW = HOUR_COL_W + DAY_COL_W * numDays;
-  var gridH = HEADER_H + slots.length * ROW_H;
-  var C = SVG_COLORS;
-
-  var parts = [];
-  parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + gridW + ' ' + gridH + '" font-family="Arial, Helvetica, sans-serif">');
-  parts.push('<rect x="0" y="0" width="' + gridW + '" height="' + gridH + '" fill="' + C.cream + '"/>');
-
-  // Encabezado: nombre y número de cada día
-  for (var d = 0; d < numDays; d++) {
-    var dayDate = addDays(monday, d);
-    var cx = HOUR_COL_W + d * DAY_COL_W + DAY_COL_W / 2;
-    parts.push('<text x="' + cx + '" y="22" text-anchor="middle" font-size="11" letter-spacing="0.5" fill="' + C.dname + '">' + DIAS_CORTO[dayDate.getUTCDay()] + '</text>');
-    parts.push('<text x="' + cx + '" y="44" text-anchor="middle" font-size="17" font-weight="bold" fill="' + C.ink + '">' + dayDate.getUTCDate() + '</text>');
-  }
-  parts.push('<rect x="0" y="' + (HEADER_H - 3) + '" width="' + gridW + '" height="3" fill="' + C.gold + '"/>');
-
-  // Filas: hora + celdas de cada día
-  for (var s = 0; s < slots.length; s++) {
-    var slot = slots[s];
-    var y = HEADER_H + s * ROW_H;
-    parts.push('<text x="' + (HOUR_COL_W - 6) + '" y="' + (y + ROW_H / 2 + 4) + '" text-anchor="end" font-size="10.5" font-weight="600" fill="' + C.hour + '">' + slot.label + '</text>');
-
-    for (var d2 = 0; d2 < numDays; d2++) {
-      var dayDate2 = addDays(monday, d2);
-      var slotStartUTC = civilDateTimeToUTC(dayDate2, slot.h, slot.m);
-      var slotEndUTC = new Date(slotStartUTC.getTime() + SLOT_MINUTES * 60000);
-      var intervals = occupiedByDay[d2] || [];
-      var occupied = isSlotOccupied(slotStartUTC, slotEndUTC, intervals);
-      var x = HOUR_COL_W + d2 * DAY_COL_W;
-      var fill = occupied ? C.ocupado : C.disponible;
-      parts.push('<rect x="' + x + '" y="' + y + '" width="' + DAY_COL_W + '" height="' + ROW_H + '" fill="' + fill + '" stroke="' + C.border + '" stroke-width="1"/>');
-    }
-  }
-
-  // Línea vertical separando la columna de horas del resto
-  parts.push('<line x1="' + HOUR_COL_W + '" y1="0" x2="' + HOUR_COL_W + '" y2="' + gridH + '" stroke="' + C.border + '" stroke-width="1"/>');
-  // Borde exterior
-  parts.push('<rect x="0.5" y="0.5" width="' + (gridW - 1) + '" height="' + (gridH - 1) + '" fill="none" stroke="' + C.border + '" stroke-width="1"/>');
-
-  parts.push('</svg>');
-  return parts.join('');
-}
-
-function buildGridImageDataUri(monday, occupiedByDay, slots) {
-  var svg = buildGridSvg(monday, occupiedByDay, slots);
-  return 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf8').toString('base64');
-}
-
-function swatchSvgUri(hexColor) {
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="3" fill="' + hexColor + '" stroke="' + SVG_COLORS.border + '"/></svg>';
-  return 'data:image/svg+xml;base64,' + Buffer.from(svg, 'utf8').toString('base64');
-}
-const SWATCH_OCUPADO_URI = swatchSvgUri(SVG_COLORS.ocupado);
-const SWATCH_DISPONIBLE_URI = swatchSvgUri(SVG_COLORS.disponible);
-
 // ==================== HTML / ESTILOS (mobile-first) ====================
 function renderWeekPage(opts) {
   var monday = opts.monday, sunday = opts.sunday, occupiedByDay = opts.occupiedByDay;
   var minMonday = opts.minMonday, maxMonday = opts.maxMonday, base = opts.todaysBaseUrl;
 
   var slots = buildSlotLabels();
-  var gridImageUri = buildGridImageDataUri(monday, occupiedByDay, slots);
+
+  var headerCells = '';
+  for (var d = 0; d < DAYS_PER_WEEK; d++) {
+    var dayDate = addDays(monday, d);
+    headerCells += '<th><span class="dname">' + DIAS_CORTO[dayDate.getUTCDay()] + '</span><span class="dnum">' + dayDate.getUTCDate() + '</span></th>';
+  }
+
+  var rowsHtml = '';
+  for (var s = 0; s < slots.length; s++) {
+    var slot = slots[s];
+    rowsHtml += '<tr><td class="hour">' + slot.label + '</td>';
+    for (var d2 = 0; d2 < DAYS_PER_WEEK; d2++) {
+      var dayDate2 = addDays(monday, d2);
+      var slotStartUTC = civilDateTimeToUTC(dayDate2, slot.h, slot.m);
+      var slotEndUTC = new Date(slotStartUTC.getTime() + SLOT_MINUTES * 60000);
+      var intervals = occupiedByDay[d2] || [];
+      var occupied = isSlotOccupied(slotStartUTC, slotEndUTC, intervals);
+      rowsHtml += '<td class="' + (occupied ? 'ocupado' : 'disponible') + '"></td>';
+    }
+    rowsHtml += '</tr>';
+  }
 
   var prevMonday = addDays(monday, -7);
   var nextMonday = addDays(monday, 7);
@@ -292,29 +244,37 @@ function renderWeekPage(opts) {
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
 '  .brand{display:flex;align-items:center;justify-content:center;margin-bottom:2px;}' +
 '  .brand-mark{height:46px;width:auto;object-fit:contain;display:block;}' +
-'  .brand-name{letter-spacing:1.5px;font-size:12px;text-transform:uppercase;color:var(--gold);font-weight:600;}' +
 '  h1{text-align:center;font-family:Georgia,"Times New Roman",serif;font-size:20px;margin:10px 0 0;font-weight:normal;letter-spacing:.5px;}' +
 '  .sub{display:block;text-transform:uppercase;font-size:17px;font-weight:bold;letter-spacing:1.5px;margin-top:2px;color:var(--ink);}' +
 '  .nav{display:flex;justify-content:space-between;gap:8px;margin:16px 0;}' +
 '  .nav-btn{flex:1;text-align:center;text-decoration:none;color:var(--ink);background:var(--disponible);border:1px solid var(--border);padding:12px 8px;border-radius:10px;font-size:14px;font-weight:600;}' +
 '  .nav-btn.disabled{opacity:.35;}' +
-'  .legend{display:flex;justify-content:center;gap:18px;margin:14px 0 4px;font-size:12px;}' +
-'  .legend span{display:inline-flex;align-items:center;gap:5px;}' +
 '  .color-note{display:flex;justify-content:center;gap:16px;margin:10px 0 4px;font-size:13px;flex-wrap:wrap;}' +
 '  .color-note span{display:inline-flex;align-items:center;gap:6px;}' +
 '  .color-note b{font-weight:700;}' +
-'  .swatch{width:13px;height:13px;display:inline-block;vertical-align:middle;}' +
-'  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;line-height:0;}' +
-'  .grid-img{display:block;width:100%;height:auto;}' +
+'  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
+'  .swatch.oc{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
+'  .swatch.disp{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
+'  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;}' +
+'  table{border-collapse:collapse;width:100%;table-layout:fixed;background:var(--cream);}' +
+'  th{background:var(--cream);color:var(--ink);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
+'  th .dname{display:block;color:#7a7266;}' +
+'  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
+'  td.hour{width:44px;}' +
+'  td{border:1px solid var(--border);height:18px;padding:0;}' +
+'  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245;font-weight:600;white-space:nowrap;background:var(--cream);}' +
+'  td.disponible{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
+'  td.ocupado{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
 '  .footnote{text-align:center;font-size:9px;color:#8a8172;margin:10px 0;line-height:1.4;}' +
 '  .legal-small{text-align:center;font-size:9px;color:#a39a8c;margin:0 0 12px;line-height:1.3;padding:0 6px;}' +
+'  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
 '</style></head><body>' +
 '  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
-'  <div class="color-note"><span><img class="swatch" src="' + SWATCH_OCUPADO_URI + '" alt="" /><b>Rojo</b> = Ocupado</span><span><img class="swatch" src="' + SWATCH_DISPONIBLE_URI + '" alt="" /><b>Beige</b> = Disponible</span></div>' +
+'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Beige</b> = Disponible</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
 '  <p class="legal-small">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
-'  <div class="table-wrap"><img class="grid-img" src="' + gridImageUri + '" alt="Grilla de disponibilidad" /></div>' +
+'  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
   footnote +
 '</body></html>';
 }
