@@ -31,12 +31,15 @@ module.exports = async (req, res) => {
     // Se puede ver 1 semana hacia atrás además de la actual (referencia/margen).
     const minMonday = addDays(getMonday(today), -7);
 
-    // El mes siguiente recién se "libera" en la vista pública al llegar a la
+    // El mes siguiente recién se libera en la vista pública al llegar a la
     // última semana del mes actual (momento en que se confirman las renovaciones
     // con los clientes). Antes de eso, el tope de navegación es fin del mes actual.
     const lastDayOfCurrentMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
     const lastWeekStartOfCurrentMonth = getMonday(lastDayOfCurrentMonth);
-    const nextMonthUnlocked = today.getTime() >= lastWeekStartOfCurrentMonth.getTime();
+    // El domingo no se muestra en la grilla (lun-sáb), pero para decidir si ya
+    // liberamos el mes siguiente lo contamos como si ya fuera el lunes que sigue.
+    const todayForUnlockCheck = today.getUTCDay() === 0 ? addDays(today, 1) : today;
+    const nextMonthUnlocked = todayForUnlockCheck.getTime() >= lastWeekStartOfCurrentMonth.getTime();
 
     const maxMonday = nextMonthUnlocked
       ? getMonday(civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0))
