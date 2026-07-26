@@ -1,6 +1,10 @@
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
 
+const PX_DISPONIBLE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR42mN8+/wWAwwwMSAB3BwAhxMCtsH8K8IAAAAASUVORK5CYII=';
+const PX_OCUPADO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR42mM8mR3DAANMDEgANwcAT5EBmPS9jO8AAAAASUVORK5CYII=';
+const PX_CREAM = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR42mP8/uklAwwwMSAB3BwAjhYC2p683YUAAAAASUVORK5CYII=';
+
 // ---------------------- CONFIGURACIÓN DEL ESPACIO ----------------------
 const START_HOUR = 8;
 const END_HOUR = 23;
@@ -245,18 +249,18 @@ function renderWeekPage(opts) {
 '  .color-note span{display:inline-flex;align-items:center;gap:6px;}' +
 '  .color-note b{font-weight:700;}' +
 '  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
-'  .swatch.oc{background-image:linear-gradient(var(--ocupado),var(--ocupado));}' +
-'  .swatch.disp{background-image:linear-gradient(var(--disponible),var(--disponible));}' +
+'  .swatch.oc{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
+'  .swatch.disp{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
 '  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;forced-color-adjust:none;}' +
-'  table{border-collapse:collapse;width:100%;table-layout:fixed;background-image:linear-gradient(var(--cream),var(--cream));}' +
-'  th{background-image:linear-gradient(var(--cream),var(--cream));color:var(--ink);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
+'  table{border-collapse:collapse;width:100%;table-layout:fixed;background-image:url(' + PX_CREAM + ');background-repeat:repeat;}' +
+'  th{background-image:url(' + PX_CREAM + ');background-repeat:repeat;color:var(--ink);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
 '  th .dname{display:block;color:#7a7266;}' +
 '  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
 '  td.hour{width:44px;}' +
 '  td{border:1px solid var(--border);height:18px;padding:0;}' +
-'  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245 !important;font-weight:600;white-space:nowrap;background-image:linear-gradient(var(--cream),var(--cream));}' +
-'  td.disponible{background-image:linear-gradient(var(--disponible),var(--disponible));}' +
-'  td.ocupado{background-image:linear-gradient(var(--ocupado),var(--ocupado));}' +
+'  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245 !important;font-weight:600;white-space:nowrap;background-image:url(' + PX_CREAM + ');background-repeat:repeat;}' +
+'  td.disponible{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
+'  td.ocupado{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
 '  .footnote{text-align:center;font-size:9px;color:#8a8172;margin:10px 0;line-height:1.4;}' +
 '  .legal-small{text-align:center;font-size:9px;color:#a39a8c;margin:0 0 12px;line-height:1.3;padding:0 6px;}' +
 '  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
@@ -270,4 +274,3 @@ function renderWeekPage(opts) {
   footnote +
 '</body></html>';
 }
-
