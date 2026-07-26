@@ -283,10 +283,10 @@ function renderWeekPage(opts) {
   return '' +
 '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
 '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-'<meta name="color-scheme" content="light only">' +
+'<meta name="color-scheme" content="only light">' +
 '<title>Espacio Elegant — Disponibilidad</title>' +
 '<style>' +
-'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--border:#E3DAC7;}' +
+'  :root{color-scheme:only light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--border:#E3DAC7;}' +
 '  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}' +
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
