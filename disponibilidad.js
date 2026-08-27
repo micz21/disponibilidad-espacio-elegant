@@ -5,7 +5,8 @@
  * (no requiere que nadie inicie sesión). Muestra una vista de semana,
  * mobile-first, sin banners de Google ni límites de iframe.
  *
- * REGLAS DE BUFFER DE LIMPIEZA 
+ *
+ * REGLAS DE BUFFER DE LIMPIEZA:
  *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
  *   - #bufferantes en el título/descripción del evento: además bloquea
  *     30 min ANTES de que empiece.
@@ -49,8 +50,12 @@ module.exports = async (req, res) => {
     // lo contamos como si ya fuera el lunes que sigue.
     const lastDayOfCurrentMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
     const lastWeekStartOfCurrentMonth = getMonday(lastDayOfCurrentMonth);
-    const todayForUnlockCheck = today.getUTCDay() === 0 ? addDays(today, 1) : today;
-    const nextMonthUnlocked = todayForUnlockCheck.getTime() >= lastWeekStartOfCurrentMonth.getTime();
+    // "Última semana del mes" = últimos 7 días calendario del mes (no agrupado por
+    // lunes-a-lunes), para que no falle cuando el último día del mes cae justo lunes
+    // (en ese caso, la semana "lunes a lunes" quedaría casi entera en el mes
+    // siguiente, y hoy nunca parecería estar "en la última semana" de verdad).
+    const daysInCurrentMonth = lastDayOfCurrentMonth.getUTCDate();
+    const nextMonthUnlocked = today.getUTCDate() >= (daysInCurrentMonth - 6);
 
     const maxMonday = nextMonthUnlocked
       ? getMonday(civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0))
@@ -117,6 +122,8 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
 }
 
 // ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
+// Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
+// para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
   return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 }
@@ -165,6 +172,9 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
     var bufferedStart = bufferBefore ? new Date(evStart.getTime() - BUFFER_MINUTES * 60000) : evStart;
     var bufferedEnd = noBuffer ? evEnd : new Date(evEnd.getTime() + BUFFER_MINUTES * 60000);
 
+    // A qué día de la semana (0-5) corresponde el INICIO del evento, en hora de Tucumán.
+    // OJO: acá vamos de UTC -> hora local, así que se RESTA el offset (al revés que
+    // civilDateTimeToUTC, que va de local -> UTC y por eso suma).
     var evStartTucuman = new Date(evStart.getTime() - TZ_OFFSET_HOURS * 3600000);
     var evStartCivil = civilDate(evStartTucuman.getUTCFullYear(), evStartTucuman.getUTCMonth(), evStartTucuman.getUTCDate());
     var dayIndex = Math.round((evStartCivil.getTime() - weekMonday.getTime()) / 86400000);
