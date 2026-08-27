@@ -5,14 +5,7 @@
  * (no requiere que nadie inicie sesión). Muestra una vista de semana,
  * mobile-first, sin banners de Google ni límites de iframe.
  *
- * VARIABLES DE ENTORNO NECESARIAS (se configuran en Vercel, no acá):
- *   GOOGLE_SERVICE_ACCOUNT_EMAIL  -> el "client_email" del JSON de la cuenta de servicio
- *   GOOGLE_PRIVATE_KEY            -> el "private_key" del JSON (tal cual, con los \n)
- *   CALENDAR_ID                   -> el ID real de tu calendario (NUNCA "primary" acá,
- *                                    porque la cuenta de servicio tiene su propio
- *                                    calendario "primary" que no es el tuyo)
- *
- * REGLAS DE BUFFER DE LIMPIEZA (iguales a como las veníamos usando):
+ * REGLAS DE BUFFER DE LIMPIEZA 
  *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
  *   - #bufferantes en el título/descripción del evento: además bloquea
  *     30 min ANTES de que empiece.
@@ -46,9 +39,22 @@ module.exports = async (req, res) => {
     const tucumanShifted = new Date(nowUTC.getTime() - TZ_OFFSET_HOURS * 3600000);
     const today = civilDate(tucumanShifted.getUTCFullYear(), tucumanShifted.getUTCMonth(), tucumanShifted.getUTCDate());
 
-    const minMonday = getMonday(today);
-    const endOfLastVisibleMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0);
-    const maxMonday = getMonday(endOfLastVisibleMonth);
+    // Se puede ver 1 semana hacia atrás además de la actual (referencia/margen).
+    const minMonday = addDays(getMonday(today), -7);
+
+    // El mes siguiente recién se "libera" en la vista pública al llegar a la
+    // última semana del mes actual (momento en que se confirman las renovaciones
+    // con los clientes). Antes de eso, el tope de navegación es fin del mes actual.
+    // El domingo no se muestra en la grilla (lun-sáb), pero para esta comprobación
+    // lo contamos como si ya fuera el lunes que sigue.
+    const lastDayOfCurrentMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
+    const lastWeekStartOfCurrentMonth = getMonday(lastDayOfCurrentMonth);
+    const todayForUnlockCheck = today.getUTCDay() === 0 ? addDays(today, 1) : today;
+    const nextMonthUnlocked = todayForUnlockCheck.getTime() >= lastWeekStartOfCurrentMonth.getTime();
+
+    const maxMonday = nextMonthUnlocked
+      ? getMonday(civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0))
+      : lastWeekStartOfCurrentMonth;
 
     let monday = params.start ? parseCivilDate(params.start) : today;
     monday = getMonday(monday);
@@ -111,8 +117,6 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
 }
 
 // ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
-// Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
-// para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
   return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 }
@@ -161,8 +165,7 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
     var bufferedStart = bufferBefore ? new Date(evStart.getTime() - BUFFER_MINUTES * 60000) : evStart;
     var bufferedEnd = noBuffer ? evEnd : new Date(evEnd.getTime() + BUFFER_MINUTES * 60000);
 
-    // A qué día de la semana (0-5) corresponde el INICIO del evento, en hora de Tucumán.
-    var evStartTucuman = new Date(evStart.getTime() + TZ_OFFSET_HOURS * 3600000);
+    var evStartTucuman = new Date(evStart.getTime() - TZ_OFFSET_HOURS * 3600000);
     var evStartCivil = civilDate(evStartTucuman.getUTCFullYear(), evStartTucuman.getUTCMonth(), evStartTucuman.getUTCDate());
     var dayIndex = Math.round((evStartCivil.getTime() - weekMonday.getTime()) / 86400000);
 
