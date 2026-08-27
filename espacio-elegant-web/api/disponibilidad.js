@@ -1,8 +1,20 @@
+/**
+ * ESPACIO ELEGANT — Disponibilidad en vivo (hosting propio, sin Apps Script)
+ * ---------------------------------------------------------------------------
+ * Lee Google Calendar directamente por su API usando una cuenta de servicio
+ * (no requiere que nadie inicie sesión). Muestra una vista de semana,
+ * mobile-first, sin banners de Google ni límites de iframe.
+ *
+ *
+ * REGLAS DE BUFFER DE LIMPIEZA:
+ *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
+ *   - #bufferantes en el título/descripción del evento: además bloquea
+ *     30 min ANTES de que empiece.
+ *   - #sinbuffer en el título/descripción: no bloquea nada extra.
+ */
+
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
-
-const PX_DISPONIBLE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABnElEQVR42gXByQHcMAwDQICHtP2Xl29+qcA2D2SG//7+Md9N5aNyv5P1W2inLK2XWiLkZUG9d8OMDcre3Js0q3iFESzOoDlIL8P6wedtCJlnYm/gm5poul/DiMuXtIBs7yq7F3Fm1FYStj5cHPSxHlj9rA0nqPaZhenZXT1D77CzoYuTjTdcm/1+PqtZqlI8S+XiYs14BItXCxFr93QN66d8yn6/eiDTMIAH55cLzEiw6wXOF4OBDbLNfsEHxs+Fq3WkLQzTjm8ZJV4Gn3rtKmD8qoksb8+c6vWBzk4z28dhDvYzmw6bH+GfYoV2C6ICtsDxMVOIk1TAmKblOs+z7SeCJmLe8RjIx54Pl0cm41RU2dLigyg7kSuAUYKr/aCxhuDGN59FQ3ZSmfv6upTvNAUrcORjI3nd9m5+B0s4TkhsLKNtslgz3g3LIcKmIDyBo5rPKflRtEvrFGXUiZ98Z+djmMs7YViNObNvsXDsll2+2BXXFVgZEY7BNyCHHQqN2kc+VtbzcuzMbLjt94hvE9Mr3wUCKReSvUvw43/Aq1fogfIxkgAAAABJRU5ErkJggg==';
-const PX_OCUPADO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAABmklEQVR42gXBiYEENwwDMOqzr8VUkTLT0o4lkQHsv3//wa/q8htkrtZja22kQWRtbG166PuU+UbOEa5jeXKD5cZJpvvRlYFQvhS/uWU+EeWOW+83dP+uZscBpwG6c4Lm/mykP/tp4ZnyMLO6bmLwZZasPsIar/AD9FUYZvNYGF9vcjgwi6VtojBmR2+QrkF57kB/XCk0NyBPbOX6nGyEKMOM6Od5y+gtN8OJVtBecHKqvDnpFgVh13UYH6zEbl5T1wtFaokoz1XnQT2FNRWbEz95OPtatPUGXhLfg8rZzGzpT3MSZg4IkRhETgrPBfkNQif9fc4j1wljgcJki/atrNrfNaKQcux4E915lxwPj4/PRFijC6a+TN59CM1zzoSiEEFMOp1CTuQMFXCmcKiB8YRNIXlhgrZ911xIf41TDcu1ZcxN3wU/0dfodpEc6zqBL8zkdvZp0GkZPJ2C2uU4XKtzrAml8uOaBQPeNAfKPhqra4QAY30r0P2NIvJpz9qanpubRzHXj9bceZ0bCyaMJQdDeGfMgkn9if8DCuhc5Bp/fAgAAAAASUVORK5CYII=';
 
 // ---------------------- CONFIGURACIÓN DEL ESPACIO ----------------------
 const START_HOUR = 8;
@@ -31,15 +43,19 @@ module.exports = async (req, res) => {
     // Se puede ver 1 semana hacia atrás además de la actual (referencia/margen).
     const minMonday = addDays(getMonday(today), -7);
 
-    // El mes siguiente recién se libera en la vista pública al llegar a la
+    // El mes siguiente recién se "libera" en la vista pública al llegar a la
     // última semana del mes actual (momento en que se confirman las renovaciones
     // con los clientes). Antes de eso, el tope de navegación es fin del mes actual.
+    // El domingo no se muestra en la grilla (lun-sáb), pero para esta comprobación
+    // lo contamos como si ya fuera el lunes que sigue.
     const lastDayOfCurrentMonth = civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1, 0);
     const lastWeekStartOfCurrentMonth = getMonday(lastDayOfCurrentMonth);
-    // El domingo no se muestra en la grilla (lun-sáb), pero para decidir si ya
-    // liberamos el mes siguiente lo contamos como si ya fuera el lunes que sigue.
-    const todayForUnlockCheck = today.getUTCDay() === 0 ? addDays(today, 1) : today;
-    const nextMonthUnlocked = todayForUnlockCheck.getTime() >= lastWeekStartOfCurrentMonth.getTime();
+    // "Última semana del mes" = últimos 7 días calendario del mes (no agrupado por
+    // lunes-a-lunes), para que no falle cuando el último día del mes cae justo lunes
+    // (en ese caso, la semana "lunes a lunes" quedaría casi entera en el mes
+    // siguiente, y hoy nunca parecería estar "en la última semana" de verdad).
+    const daysInCurrentMonth = lastDayOfCurrentMonth.getUTCDate();
+    const nextMonthUnlocked = today.getUTCDate() >= (daysInCurrentMonth - 6);
 
     const maxMonday = nextMonthUnlocked
       ? getMonday(civilDate(today.getUTCFullYear(), today.getUTCMonth() + 1 + MAX_MONTHS_AHEAD, 0))
@@ -106,6 +122,8 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
 }
 
 // ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
+// Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
+// para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
   return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 }
@@ -132,6 +150,8 @@ function fmtCivil(civil) {
   return y + '-' + m + '-' + d;
 }
 
+// Convierte un día civil + hora/minuto en horario de Tucumán a un instante UTC real,
+// para poder compararlo con los horarios (que sí vienen con huso horario) del Calendar.
 function civilDateTimeToUTC(civil, hour, minute) {
   return new Date(civil.getTime() + (hour * 60 + minute) * 60000 + TZ_OFFSET_HOURS * 3600000);
 }
@@ -238,46 +258,48 @@ function renderWeekPage(opts) {
   return '' +
 '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
 '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-'<meta name="color-scheme" content="only light">' +
+'<meta name="color-scheme" content="light only">' +
 '<title>Espacio Elegant — Disponibilidad</title>' +
 '<style>' +
-'  :root{color-scheme:only light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--border:#E3DAC7;}' +
+'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--border:#E3DAC7;}' +
 '  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}' +
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
 '  .brand{display:flex;align-items:center;justify-content:center;margin-bottom:2px;}' +
-'  .brand-mark{height:46px;width:auto;object-fit:contain;display:block;}' +
+'  .brand-mark{height:64px;width:auto;object-fit:contain;display:block;}' +
+'  .brand-name{letter-spacing:1.5px;font-size:12px;text-transform:uppercase;color:var(--gold);font-weight:600;}' +
 '  h1{text-align:center;font-family:Georgia,"Times New Roman",serif;font-size:20px;margin:10px 0 0;font-weight:normal;letter-spacing:.5px;}' +
 '  .sub{display:block;text-transform:uppercase;font-size:17px;font-weight:bold;letter-spacing:1.5px;margin-top:2px;color:var(--ink);}' +
 '  .nav{display:flex;justify-content:space-between;gap:8px;margin:16px 0;}' +
 '  .nav-btn{flex:1;text-align:center;text-decoration:none;color:var(--ink);background:var(--disponible);border:1px solid var(--border);padding:12px 8px;border-radius:10px;font-size:14px;font-weight:600;}' +
 '  .nav-btn.disabled{opacity:.35;}' +
+'  .legend{display:flex;justify-content:center;gap:18px;margin:14px 0 4px;font-size:12px;}' +
+'  .legend span{display:inline-flex;align-items:center;gap:5px;}' +
 '  .color-note{display:flex;justify-content:center;gap:16px;margin:10px 0 4px;font-size:13px;flex-wrap:wrap;}' +
 '  .color-note span{display:inline-flex;align-items:center;gap:6px;}' +
 '  .color-note b{font-weight:700;}' +
 '  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
-'  .swatch.oc{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
-'  .swatch.disp{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
+'  .swatch.oc{background:var(--ocupado);}' +
+'  .swatch.disp{background:var(--disponible);}' +
 '  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;}' +
 '  table{border-collapse:collapse;width:100%;table-layout:fixed;background:var(--cream);}' +
-'  th{background:var(--cream);color:var(--ink);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
+'  th{background:var(--cream);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
 '  th .dname{display:block;color:#7a7266;}' +
 '  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
 '  td.hour{width:44px;}' +
 '  td{border:1px solid var(--border);height:18px;padding:0;}' +
 '  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245;font-weight:600;white-space:nowrap;background:var(--cream);}' +
-'  td.disponible{background-image:url(' + PX_DISPONIBLE + ');background-repeat:repeat;}' +
-'  td.ocupado{background-image:url(' + PX_OCUPADO + ');background-repeat:repeat;}' +
-'  .footnote{text-align:center;font-size:9px;color:#8a8172;margin:10px 0;line-height:1.4;}' +
-'  .legal-small{text-align:center;font-size:9px;color:#a39a8c;margin:0 0 12px;line-height:1.3;padding:0 6px;}' +
+'  td.disponible{background:var(--disponible);}' +
+'  td.ocupado{background:var(--ocupado);}' +
+'  .footnote{text-align:center;font-size:11px;color:#8a8172;margin-top:14px;}' +
 '  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
 '</style></head><body>' +
 '  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
 '  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Beige</b> = Disponible</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
-'  <p class="legal-small">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
   footnote +
+'  <p class="footnote">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '</body></html>';
 }
