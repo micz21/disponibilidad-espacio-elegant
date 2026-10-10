@@ -280,7 +280,7 @@ function renderWeekPage(opts) {
 '<meta name="color-scheme" content="light only">' +
 '<title>Espacio Elegant — Disponibilidad</title>' +
 '<style>' +
-'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--verde:#CFE8C6;--border:#E3DAC7;}' +
+'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--verde:#A9D79A;--border:#E3DAC7;}' +
 '  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}' +
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
@@ -308,7 +308,7 @@ function renderWeekPage(opts) {
 '  th .dname{display:block;color:#7a7266;}' +
 '  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
 '  td.hour{width:44px;}' +
-'  td{border:1px solid var(--border);height:18px;padding:0;position:relative;}' +
+'  td{border:1px solid #fff;height:18px;padding:0;position:relative;}' +
 '  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245;font-weight:600;white-space:nowrap;background:var(--cream);}' +
 '  td.disponible{background:var(--verde);}' +
 '  td.ocupado{background:var(--ocupado);}' +
@@ -318,7 +318,7 @@ function renderWeekPage(opts) {
 '</style></head><body>' +
 '  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
-'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Verde</b> = Disponible</span><span><span class="swatch mens"></span><b>Punto</b> = Alquiler mensual (todo el mes)</span></div>' +
+'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Verde</b> = Disponible</span><span><span class="swatch mens"></span>Alquiler mensual</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
 '  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
   footnote +
