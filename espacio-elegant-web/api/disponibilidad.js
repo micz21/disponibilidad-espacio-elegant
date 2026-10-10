@@ -310,4 +310,3 @@ function renderWeekPage(opts) {
 '  <p class="footnote">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '</body></html>';
 }
-}
