@@ -7,7 +7,7 @@
  *     30 min ANTES de que empiece.
  *   - #sinbuffer en el título/descripción: no bloquea nada extra.
  */
-
+//
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
 
