@@ -1,13 +1,24 @@
-/*
- * ESPACIO ELEGANT — Disponibilidad en vivo 
+/**
+ * ESPACIO ELEGANT — Disponibilidad en vivo (hosting propio, sin Apps Script)
  * ---------------------------------------------------------------------------
+ * Lee Google Calendar directamente por su API usando una cuenta de servicio
+ * (no requiere que nadie inicie sesión). Muestra una vista de semana,
+ * mobile-first, sin banners de Google ni límites de iframe.
+ *
+ * VARIABLES DE ENTORNO NECESARIAS (se configuran en Vercel, no acá):
+ *   GOOGLE_SERVICE_ACCOUNT_EMAIL  -> el "client_email" del JSON de la cuenta de servicio
+ *   GOOGLE_PRIVATE_KEY            -> el "private_key" del JSON (tal cual, con los \n)
+ *   CALENDAR_ID                   -> el ID real de tu calendario (NUNCA "primary" acá,
+ *                                    porque la cuenta de servicio tiene su propio
+ *                                    calendario "primary" que no es el tuyo)
+ *
  * REGLAS DE BUFFER DE LIMPIEZA (iguales a como las veníamos usando):
  *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
  *   - #bufferantes en el título/descripción del evento: además bloquea
  *     30 min ANTES de que empiece.
  *   - #sinbuffer en el título/descripción: no bloquea nada extra.
  */
-//
+
 const { JWT } = require('google-auth-library');
 const LOGO_DATA_URI = require('./_logo.js');
 
@@ -118,7 +129,7 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
   return data.items || [];
 }
 
-// ==================== FECHAS (año/mes/día, sin horas) ====================
+// ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
 // Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
 // para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
@@ -147,6 +158,8 @@ function fmtCivil(civil) {
   return y + '-' + m + '-' + d;
 }
 
+// Convierte un día civil + hora/minuto en horario de Tucumán a un instante UTC real,
+// para poder compararlo con los horarios (que sí vienen con huso horario) del Calendar.
 function civilDateTimeToUTC(civil, hour, minute) {
   return new Date(civil.getTime() + (hour * 60 + minute) * 60000 + TZ_OFFSET_HOURS * 3600000);
 }
@@ -168,6 +181,8 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
     var bufferedEnd = noBuffer ? evEnd : new Date(evEnd.getTime() + BUFFER_MINUTES * 60000);
 
     // A qué día de la semana (0-5) corresponde el INICIO del evento, en hora de Tucumán.
+    // OJO: acá vamos de UTC -> hora local, así que se RESTA el offset (al revés que
+    // civilDateTimeToUTC, que va de local -> UTC y por eso suma).
     var evStartTucuman = new Date(evStart.getTime() - TZ_OFFSET_HOURS * 3600000);
     var evStartCivil = civilDate(evStartTucuman.getUTCFullYear(), evStartTucuman.getUTCMonth(), evStartTucuman.getUTCDate());
     var dayIndex = Math.round((evStartCivil.getTime() - weekMonday.getTime()) / 86400000);
