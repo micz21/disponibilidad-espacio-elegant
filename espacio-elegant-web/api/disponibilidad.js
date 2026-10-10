@@ -191,7 +191,7 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
 
     if (!byDay[dayIndex]) byDay[dayIndex] = [];
     var monthly = text.indexOf(MONTHLY_TAG) !== -1 || (MARK_RECURRING_AS_MONTHLY && !!ev.recurringEventId);
-    byDay[dayIndex].push({ start: bufferedStart, end: bufferedEnd, eventStart: evStart, monthly: monthly });
+    byDay[dayIndex].push({ start: bufferedStart, end: bufferedEnd, eventStart: evStart, eventEnd: evEnd, monthly: monthly });
   });
 
   return byDay;
@@ -204,11 +204,11 @@ function isSlotOccupied(slotStartUTC, slotEndUTC, intervals) {
   return false;
 }
 
-// ¿Hay un alquiler mensual que COMIENZA dentro de este casillero?
-function hasMonthlyStart(slotStartUTC, slotEndUTC, intervals) {
+// ¿Este casillero cae dentro de un alquiler mensual? (solo el evento en sí, sin el buffer de limpieza)
+function hasMonthlyIn(slotStartUTC, slotEndUTC, intervals) {
   for (var i = 0; i < intervals.length; i++) {
     var iv = intervals[i];
-    if (iv.monthly && iv.eventStart >= slotStartUTC && iv.eventStart < slotEndUTC) return true;
+    if (iv.monthly && slotStartUTC < iv.eventEnd && slotEndUTC > iv.eventStart) return true;
   }
   return false;
 }
@@ -253,7 +253,7 @@ function renderWeekPage(opts) {
       var slotEndUTC = new Date(slotStartUTC.getTime() + SLOT_MINUTES * 60000);
       var intervals = occupiedByDay[d2] || [];
       var occupied = isSlotOccupied(slotStartUTC, slotEndUTC, intervals);
-      var dot = occupied && hasMonthlyStart(slotStartUTC, slotEndUTC, intervals) ? '<span class="mensual"></span>' : '';
+      var dot = occupied && hasMonthlyIn(slotStartUTC, slotEndUTC, intervals) ? '<span class="mensual"></span>' : '';
       rowsHtml += '<td class="' + (occupied ? 'ocupado' : 'disponible') + '">' + dot + '</td>';
     }
     rowsHtml += '</tr>';
