@@ -1,12 +1,7 @@
-/**
- * ESPACIO ELEGANT — Disponibilidad en vivo (hosting propio, sin Apps Script)
+/*
+ * ESPACIO ELEGANT — Disponibilidad en vivo 
  * ---------------------------------------------------------------------------
- * Lee Google Calendar directamente por su API usando una cuenta de servicio
- * (no requiere que nadie inicie sesión). Muestra una vista de semana,
- * mobile-first, sin banners de Google ni límites de iframe.
- *
- *
- * REGLAS DE BUFFER DE LIMPIEZA:
+ * REGLAS DE BUFFER DE LIMPIEZA (iguales a como las veníamos usando):
  *   - Por defecto: cada turno bloquea 30 min extra DESPUÉS de terminar.
  *   - #bufferantes en el título/descripción del evento: además bloquea
  *     30 min ANTES de que empiece.
@@ -25,6 +20,8 @@ const NO_BUFFER_TAG = '#sinbuffer';
 const BUFFER_BEFORE_TAG = '#bufferantes';
 const DAYS_PER_WEEK = 6; // lunes a sábado
 const MAX_MONTHS_AHEAD = 1; // deja ver el mes actual completo + el siguiente completo
+const MONTHLY_TAG = '#mensual';
+const MARK_RECURRING_AS_MONTHLY = false; // true = todo evento repetido semanalmente se marca como mensual
 const TZ_OFFSET_HOURS = 3; // Argentina (Tucumán) = UTC-3, sin horario de verano
 // -------------------------------------------------------------------------
 
@@ -121,7 +118,7 @@ async function fetchCalendarEvents(timeMinUTC, timeMaxUTC) {
   return data.items || [];
 }
 
-// ==================== FECHAS "CIVILES" (año/mes/día, sin horas) ====================
+// ==================== FECHAS (año/mes/día, sin horas) ====================
 // Representamos cada día como medianoche UTC, y SIEMPRE leemos con getUTC*,
 // para que el resultado no dependa de en qué zona horaria corre el servidor.
 function civilDate(year, month, day) {
@@ -150,8 +147,6 @@ function fmtCivil(civil) {
   return y + '-' + m + '-' + d;
 }
 
-// Convierte un día civil + hora/minuto en horario de Tucumán a un instante UTC real,
-// para poder compararlo con los horarios (que sí vienen con huso horario) del Calendar.
 function civilDateTimeToUTC(civil, hour, minute) {
   return new Date(civil.getTime() + (hour * 60 + minute) * 60000 + TZ_OFFSET_HOURS * 3600000);
 }
@@ -173,8 +168,6 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
     var bufferedEnd = noBuffer ? evEnd : new Date(evEnd.getTime() + BUFFER_MINUTES * 60000);
 
     // A qué día de la semana (0-5) corresponde el INICIO del evento, en hora de Tucumán.
-    // OJO: acá vamos de UTC -> hora local, así que se RESTA el offset (al revés que
-    // civilDateTimeToUTC, que va de local -> UTC y por eso suma).
     var evStartTucuman = new Date(evStart.getTime() - TZ_OFFSET_HOURS * 3600000);
     var evStartCivil = civilDate(evStartTucuman.getUTCFullYear(), evStartTucuman.getUTCMonth(), evStartTucuman.getUTCDate());
     var dayIndex = Math.round((evStartCivil.getTime() - weekMonday.getTime()) / 86400000);
@@ -182,7 +175,8 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
     if (dayIndex < 0 || dayIndex >= numDays) return;
 
     if (!byDay[dayIndex]) byDay[dayIndex] = [];
-    byDay[dayIndex].push({ start: bufferedStart, end: bufferedEnd });
+    var monthly = text.indexOf(MONTHLY_TAG) !== -1 || (MARK_RECURRING_AS_MONTHLY && !!ev.recurringEventId);
+    byDay[dayIndex].push({ start: bufferedStart, end: bufferedEnd, eventStart: evStart, monthly: monthly });
   });
 
   return byDay;
@@ -191,6 +185,15 @@ function buildOccupiedByDay(events, weekMonday, numDays) {
 function isSlotOccupied(slotStartUTC, slotEndUTC, intervals) {
   for (var i = 0; i < intervals.length; i++) {
     if (slotStartUTC < intervals[i].end && slotEndUTC > intervals[i].start) return true;
+  }
+  return false;
+}
+
+// ¿Hay un alquiler mensual que COMIENZA dentro de este casillero?
+function hasMonthlyStart(slotStartUTC, slotEndUTC, intervals) {
+  for (var i = 0; i < intervals.length; i++) {
+    var iv = intervals[i];
+    if (iv.monthly && iv.eventStart >= slotStartUTC && iv.eventStart < slotEndUTC) return true;
   }
   return false;
 }
@@ -235,7 +238,8 @@ function renderWeekPage(opts) {
       var slotEndUTC = new Date(slotStartUTC.getTime() + SLOT_MINUTES * 60000);
       var intervals = occupiedByDay[d2] || [];
       var occupied = isSlotOccupied(slotStartUTC, slotEndUTC, intervals);
-      rowsHtml += '<td class="' + (occupied ? 'ocupado' : 'disponible') + '"></td>';
+      var dot = occupied && hasMonthlyStart(slotStartUTC, slotEndUTC, intervals) ? '<span class="mensual"></span>' : '';
+      rowsHtml += '<td class="' + (occupied ? 'ocupado' : 'disponible') + '">' + dot + '</td>';
     }
     rowsHtml += '</tr>';
   }
@@ -261,7 +265,7 @@ function renderWeekPage(opts) {
 '<meta name="color-scheme" content="light only">' +
 '<title>Espacio Elegant — Disponibilidad</title>' +
 '<style>' +
-'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--border:#E3DAC7;}' +
+'  :root{color-scheme:light;--cream:#F7F2E9;--gold:#B08D57;--ink:#2A2420;--ocupado:#C96B5C;--disponible:#EDE7DA;--verde:#CFE8C6;--border:#E3DAC7;}' +
 '  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}' +
 '  html,body{margin:0;padding:0;background:var(--cream) !important;}' +
 '  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);padding:18px 10px 40px;max-width:480px;margin:0 auto;}' +
@@ -280,26 +284,30 @@ function renderWeekPage(opts) {
 '  .color-note b{font-weight:700;}' +
 '  .swatch{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid var(--border);}' +
 '  .swatch.oc{background:var(--ocupado);}' +
-'  .swatch.disp{background:var(--disponible);}' +
+'  .swatch.disp{background:var(--verde);}' +
+'  .swatch.mens{background:var(--ocupado);position:relative;}' +
+'  .swatch.mens:after{content:"";position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:#fff;}' +
 '  .table-wrap{border-radius:12px;border:1px solid var(--border);overflow:hidden;}' +
 '  table{border-collapse:collapse;width:100%;table-layout:fixed;background:var(--cream);}' +
 '  th{background:var(--cream);font-size:10px;text-transform:uppercase;letter-spacing:.3px;padding:6px 1px;border-bottom:2px solid var(--gold);text-align:center;line-height:1.3;}' +
 '  th .dname{display:block;color:#7a7266;}' +
 '  th .dnum{display:block;font-size:13px;font-weight:bold;color:var(--ink);}' +
 '  td.hour{width:44px;}' +
-'  td{border:1px solid var(--border);height:18px;padding:0;}' +
+'  td{border:1px solid var(--border);height:18px;padding:0;position:relative;}' +
 '  td.hour{font-size:11px;text-align:right;padding-right:5px;color:#5a5245;font-weight:600;white-space:nowrap;background:var(--cream);}' +
-'  td.disponible{background:var(--disponible);}' +
+'  td.disponible{background:var(--verde);}' +
 '  td.ocupado{background:var(--ocupado);}' +
+'  .mensual{position:absolute;top:2px;right:2px;width:6px;height:6px;border-radius:50%;background:#fff;}' +
 '  .footnote{text-align:center;font-size:11px;color:#8a8172;margin-top:14px;}' +
 '  @media (min-width:480px){ td{height:22px;} th{font-size:12px;padding:9px 2px;} th .dnum{font-size:15px;} td.hour{font-size:13px;} }' +
 '</style></head><body>' +
 '  <div class="brand"><img class="brand-mark" src="' + LOGO_DATA_URI + '" alt="Espacio Elegant" /></div>' +
 '  <h1>Disponibilidad<span class="sub">' + rangeLabel + '</span></h1>' +
-'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Beige</b> = Disponible</span></div>' +
+'  <div class="color-note"><span><span class="swatch oc"></span><b>Rojo</b> = Ocupado</span><span><span class="swatch disp"></span><b>Verde</b> = Disponible</span><span><span class="swatch mens"></span><b>Punto</b> = Alquiler mensual (todo el mes)</span></div>' +
 '  <div class="nav">' + prevBtn + nextBtn + '</div>' +
 '  <div class="table-wrap"><table><thead><tr><th></th>' + headerCells + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
   footnote +
 '  <p class="footnote">*Disponibilidad sujeta a cambios. Consultar vigencia al momento de reserva. El alquiler es mínimo una hora.</p>' +
 '</body></html>';
+}
 }
